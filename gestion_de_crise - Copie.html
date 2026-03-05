@@ -1,0 +1,1900 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>War Room - Gestion de Crise Cyber - DoctoLibre</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+
+    <!-- Firebase SDK (CDN) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <!-- Notre script de connexion Firebase -->
+    <script src="./firebase-manager.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F3F4F6; /* gray-100 */
+            color: #1F2937; /* gray-800 */
+        }
+        .tab-button.active {
+            border-bottom: 2px solid #3B82F6;
+            background-color: #FFFFFF;
+            color: #1D4ED8;
+            font-weight: 600;
+        }
+        .tab-button:not(.active) {
+            color: #6B7280;
+        }
+        .tab-button:not(.active):hover {
+            background-color: #E5E7EB;
+            color: #374151;
+        }
+        .crisis-declared {
+            animation: pulse-bg 2s infinite;
+        }
+        @keyframes pulse-bg {
+            0% { background-color: #FEF2F2; border-color: #FECACA; } /* red-50 */
+            50% { background-color: #FEE2E2; border-color: #F87171; } /* red-100 */
+            100% { background-color: #FEF2F2; border-color: #FECACA; }
+        }
+        .post-crisis-mode {
+            background-color: #EFF6FF; /* blue-50 */
+            border-color: #BFDBFE;
+        }
+        .spinner {
+            border-color: #D1D5DB;
+            border-top-color: #3B82F6;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+        /* Custom file input */
+        input[type="file"] {
+            display: none;
+        }
+        .custom-file-upload {
+            border: 1px solid #D1D5DB;
+            display: inline-block;
+            padding: 6px 12px;
+            cursor: pointer;
+            background-color: #FFFFFF;
+            color: #4B5563;
+            border-radius: 0.375rem;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .custom-file-upload:hover {
+            background-color: #F9FAFB;
+            border-color: #9CA3AF;
+        }
+        .journal-entry-inject {
+            font-weight: bold;
+            color: #DC2626; /* red-600 */
+        }
+        .journal-entry-system {
+            font-weight: bold;
+            color: #D97706; /* amber-600 */
+        }
+        /* Social Media Feed */
+        .tweet-enter {
+            animation: slide-in-right 0.5s ease-out forwards;
+        }
+        @keyframes slide-in-right {
+            0% { opacity: 0; transform: translateX(20px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+        .tweet-card {
+            border-left: 3px solid #1DA1F2;
+            background-color: #FFFFFF;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+<body class="h-full antialiased">
+
+    <div class="flex flex-col h-full">
+        <!-- HEADER -->
+        <header class="bg-white border-b border-gray-200 p-4 flex items-center justify-between shadow-sm flex-shrink-0 relative z-10">
+            <div class="flex items-center">
+                <i data-feather="shield" class="text-blue-600 h-8 w-8 mr-3"></i>
+                <div class="mr-4">
+                    <h1 class="text-xl font-bold text-gray-800">DoctoLibre - War Room</h1>
+                    <p class="text-sm text-gray-500">Plan de Gestion de Crise Cyber</p>
+                </div>
+                <!-- BOITONS SAUVEGARDE FIREBASE -->
+                <div class="flex space-x-2 border-l border-gray-200 pl-4 py-1">
+                    <button class="bg-gray-100 hover:bg-gray-200 text-green-600 border border-gray-300 rounded p-2 transition-colors" title="Sauvegarder la Crise (Cloud)" onclick="saveToCloud()"><i data-feather="upload-cloud"></i></button>
+                    <button class="bg-gray-100 hover:bg-gray-200 text-blue-600 border border-gray-300 rounded p-2 transition-colors" title="Charger depuis Cloud" onclick="loadFromCloud()"><i data-feather="download-cloud"></i></button>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center bg-gray-50 rounded-md px-3 py-1 border border-gray-300">
+                    <i data-feather="cpu" class="text-gray-400 h-4 w-4 mr-2"></i>
+                    <select id="gemini-model-select" class="bg-transparent border-none text-gray-700 text-sm focus:outline-none w-36 transition-all cursor-pointer">
+                        <option value="gemini-2.5-flash" class="bg-white text-gray-900">Gemini 2.5 Flash</option>
+                        <option value="gemini-2.0-flash" class="bg-white text-gray-900">Gemini 2.0 Flash</option>
+                        <option value="gemini-1.5-flash" class="bg-white text-gray-900">Gemini 1.5 Flash</option>
+                        <option value="gemini-1.5-pro" class="bg-white text-gray-900">Gemini 1.5 Pro</option>
+                    </select>
+                </div>
+                <div class="flex items-center bg-gray-50 rounded-md px-3 py-1 border border-gray-300">
+                    <i data-feather="key" class="text-gray-400 h-4 w-4 mr-2"></i>
+                    <input type="password" id="api-key-input" placeholder="Clé API Gemini" class="bg-transparent border-none text-gray-700 text-sm focus:outline-none w-32 transition-all focus:w-64">
+                </div>
+                <div id="clock" class="text-xl font-semibold text-gray-600 font-mono"></div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT -->
+        <main class="flex-1 flex overflow-hidden">
+            <!-- LEFT SIDEBAR -->
+            <aside class="w-1/3 bg-gray-50 p-6 overflow-y-auto border-r border-gray-200">
+                <div id="crisis-status-container" class="text-center p-4 rounded-lg bg-white border border-gray-200 shadow-sm transition-all duration-300">
+                    <h2 class="text-lg font-bold text-gray-700">STATUT DE LA CRISE</h2>
+                    <p id="crisis-status" class="text-2xl font-bold text-green-600 mt-2">Situation Nominale</p>
+                    <div id="crisis-timer" class="text-gray-500 text-lg mt-2 hidden font-mono">00:00:00</div>
+                </div>
+
+                <button id="declare-crisis-btn" class="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-transform transform hover:scale-105 shadow-md">
+                    <i data-feather="alert-triangle" class="mr-2"></i> DÉCLARER UNE CRISE
+                </button>
+                <button id="end-crisis-btn" class="w-full mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-transform transform hover:scale-105 shadow-md hidden">
+                    <i data-feather="check-square" class="mr-2"></i> TERMINER LA CRISE
+                </button>
+                <button id="reset-app-btn" class="w-full mt-4 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-transform transform hover:scale-105 shadow-md hidden">
+                    <i data-feather="refresh-cw" class="mr-2"></i> Réinitialiser (Nouvelle Crise)
+                </button>
+
+                <!-- Scénario/PGC Loader -->
+                <div id="pgc-importer-container" class="mt-8 p-4 rounded-lg bg-white border border-gray-200 shadow-sm">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">Préparation de la Crise</h3>
+                    
+                    <label for="scenario-select" class="block text-sm font-medium text-gray-600 mb-2">1. Choisir un Scénario</label>
+                    <select id="scenario-select" class="w-full bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <option value="vierge">Scénario Vierge</option>
+                        <option value="ransomware">Scénario : Rançongiciel</option>
+                        <option value="data_breach">Scénario : Fuite de Données</option>
+                        <option value="ddos_attack">Scénario : Attaque DDoS</option>
+                        <option value="supply_chain">Scénario : Compromission Fournisseur</option>
+                        <option value="pgc_custom">Importer un PGC personnalisé...</option>
+                        <option value="generate_ai" class="font-bold text-blue-600">✨ Générer via IA (Gemini)</option>
+                    </select>
+
+                    <div id="ai-difficulty-container" class="hidden mt-4 bg-blue-50 p-3 rounded-md border border-blue-100">
+                        <label for="scenario-difficulty" class="block text-sm font-medium text-blue-800 mb-2">2. Niveau de Difficulté</label>
+                        <select id="scenario-difficulty" class="w-full bg-white border border-blue-300 rounded-md px-4 py-2 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <option value="facile">Facile (Incident standard, procédures connues)</option>
+                            <option value="moyen" selected>Moyen (Complications, pression modérée)</option>
+                            <option value="difficile">Difficile (Attaque complexe, multiples vecteurs)</option>
+                            <option value="cauchemar">Cauchemar (Impact critique, menaces vitales)</option>
+                        </select>
+                    </div>
+
+                    <div id="pgc-uploader" class="hidden mt-4">
+                        <label for="pgc-importer" class="custom-file-upload w-full mb-2"><i data-feather="upload-cloud" class="inline h-4 w-4 mr-2"></i> Importer un PGC (.txt)</label>
+                        <input id="pgc-importer" type="file" accept=".txt,.md">
+                        <p id="file-name-display" class="text-xs text-center text-gray-600 truncate"></p>
+                    </div>
+                    
+                    <button id="prepare-scenario-btn" class="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-colors shadow-sm">
+                        <i data-feather="settings" class="mr-2 h-5 w-5"></i> Préparer le Scénario
+                    </button>
+                    <p id="generation-status" class="text-xs text-center text-amber-600 mt-2 font-semibold"></p>
+                </div>
+
+                <!-- Simulation Engine (Injects) - Hidden by default -->
+                <div id="simulation-engine-container" class="mt-8 p-4 rounded-lg bg-white border border-gray-200 shadow-sm hidden">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">Moteur de Simulation</h3>
+                    <button id="inject-event-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-colors shadow-sm">
+                        <i data-feather="zap" class="mr-2 h-5 w-5"></i> Injecter un Événement
+                    </button>
+                </div>
+
+                <!-- NEW: Social Media Feed Widget -->
+                <div id="social-media-container" class="mt-8 hidden">
+                    <div class="flex items-center justify-between mb-4 border-b border-gray-200 pb-2">
+                        <h3 class="text-lg font-semibold text-blue-600"><i data-feather="twitter" class="inline h-5 w-5 mr-2"></i>Live Réseaux Sociaux</h3>
+                        <span id="social-trend" class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full animate-pulse border border-red-200">#Tendance</span>
+                    </div>
+                    <div id="social-feed" class="space-y-3 h-64 overflow-y-auto bg-gray-50 p-2 rounded-lg border border-gray-200 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
+                        <p class="text-center text-gray-400 text-xs italic py-10">En attente de flux...</p>
+                    </div>
+                </div>
+
+                <!-- Gemini Advisor -->
+                <div id="gemini-advisor-container" class="mt-8">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-4 border-b border-gray-200 pb-2">Conseiller IA Gemini</h3>
+                     <button id="get-advice-btn" class="w-full mb-4 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-colors disabled:opacity-50" disabled>
+                        <i data-feather="cpu" class="mr-2 h-5 w-5"></i> Analyser la situation
+                    </button>
+                    <div id="gemini-advice-container" class="space-y-3 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                        <p class="text-sm text-gray-400 italic">Le conseiller IA s'activera une fois la crise déclarée.</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- RIGHT CONTENT AREA -->
+            <div class="flex-1 flex flex-col overflow-hidden bg-gray-50">
+                <!-- TABS -->
+                <div class="border-b border-gray-200 bg-white flex-shrink-0 pt-2 px-4">
+                    <nav id="tabs-nav" class="flex space-x-4" aria-label="Tabs">
+                        <button class="tab-button active pb-3 px-2 text-sm font-medium" data-tab="plan-action"><i data-feather="list" class="inline-block h-4 w-4 mr-2"></i>Plan d'Action</button>
+                        <button class="tab-button pb-3 px-2 text-sm font-medium" data-tab="journal"><i data-feather="book-open" class="inline-block h-4 w-4 mr-2"></i>Journal de Crise</button>
+                        <button class="tab-button pb-3 px-2 text-sm font-medium" data-tab="cellule"><i data-feather="users" class="inline-block h-4 w-4 mr-2"></i>Cellule de Crise</button>
+                        <button class="tab-button pb-3 px-2 text-sm font-medium" data-tab="communications"><i data-feather="radio" class="inline-block h-4 w-4 mr-2"></i>Communications</button>
+                        <button class="tab-button pb-3 px-2 text-sm font-medium" data-tab="annuaire"><i data-feather="phone" class="inline-block h-4 w-4 mr-2"></i>Annuaire</button>
+                        <button class="tab-button pb-3 px-2 text-sm font-medium" data-tab="phases"><i data-feather="git-commit" class="inline-block h-4 w-4 mr-2"></i>Phases</button>
+                    </nav>
+                </div>
+
+                <!-- TAB CONTENT -->
+                <div id="tab-content-container" class="flex-1 overflow-y-auto p-8">
+                    <div id="plan-action" class="tab-content">
+                        <!-- Plan d'action content -->
+                    </div>
+
+                    <div id="journal" class="tab-content hidden">
+                        <!-- Journal de crise content -->
+                    </div>
+
+                    <div id="cellule" class="tab-content hidden">
+                        <!-- Cellule de crise content -->
+                    </div>
+
+                    <div id="communications" class="tab-content hidden">
+                         <!-- Communications content -->
+                    </div>
+
+                    <div id="annuaire" class="tab-content hidden">
+                        <!-- Annuaire content -->
+                    </div>
+
+                    <div id="phases" class="tab-content hidden">
+                       <!-- Phases content -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- COMMUNICATION MODAL -->
+    <div id="comm-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden bg-gray-900/50 backdrop-blur-sm">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col border border-gray-200">
+            <div class="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0 bg-gray-50 rounded-t-lg">
+                <h2 class="text-xl font-bold text-gray-800">Rédiger une Communication</h2>
+                <button id="close-comm-modal-btn" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1">
+                <p class="mb-4 text-gray-700">Cible : <span id="comm-modal-target" class="font-semibold text-blue-600"></span></p>
+                <textarea id="comm-message-modal" rows="15" class="w-full bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" placeholder="Écrivez votre message ou générez une proposition..."></textarea>
+                <p id="comm-generation-status-modal" class="text-xs text-center text-amber-600 mt-2"></p>
+            </div>
+            <div class="p-4 border-t border-gray-200 bg-gray-50 flex justify-end space-x-4 flex-shrink-0 rounded-b-lg">
+                <button id="generate-comm-btn-modal" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-5 rounded-md flex items-center shadow-sm">
+                    <i data-feather="pen-tool" class="h-5 w-5 mr-2"></i> Générer via Gemini
+                </button>
+                <button id="log-comm-btn-modal" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-5 rounded-md flex items-center shadow-sm">
+                    <i data-feather="check" class="h-5 w-5 mr-2"></i> Valider et Journaliser
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA ---
+        let appMode = 'crisis'; // 'crisis' or 'post-crisis'
+        
+        const crisisTeam = [
+            { role: "Directeur de Crise", name: "DG", primary: "Jean-Baptiste Morin", deputy: "Directeur Financier (CFO)", color: "red", icon: "user-check", missions: ["Assume le leadership global", "Prend les décisions stratégiques finales", "Valide l'ensemble des communications externes", "Alloue les ressources exceptionnelles"] },
+            { role: "Coordinateur Opérationnel", name: "RSSI", primary: "Vous", deputy: "Adjoint RSSI", color: "blue", icon: "command", missions: ["Pilote et anime la Cellule de Crise", "Centralise et qualifie l'information", "Coordonne le plan d'action", "Point de contact unique de l'ANSSI"] },
+            { role: "Responsable Technique", name: "DSI", primary: "Directeur des SI", deputy: "Responsable Architecture", color: "indigo", icon: "cpu", missions: ["Dirige toutes les opérations techniques", "Mobilise les équipes (internes, SOC, hébergeur)", "Évalue l'impact technique et les scénarios", "Rend compte de la situation technique"] },
+            { role: "Responsable Juridique", name: "DPO", primary: "Délégué Prot. Données", deputy: "Juriste d'entreprise", color: "yellow", icon: "book", missions: ["Analyse les obligations légales", "Prépare les notifications (ANSSI, CNIL)", "Conseille sur les risques juridiques"] },
+            { role: "Responsable Communication", name: "Dir. Com.", primary: "Directeur/trice Communication", deputy: "Responsable Marketing", color: "green", icon: "message-circle", missions: ["Élabore la stratégie de communication", "Rédige tous les éléments de langage", "Organise la diffusion des messages"] }
+        ];
+
+        const crisisDirectory = {
+            internal: [
+                { role: "Directeur de Crise (DG)", name: "Jean-Baptiste Morin", phone: "+33 1 23 45 67 89", email: "jbmorin@doctolibre.fr" },
+                { role: "Coordinateur (RSSI)", name: "Vous", phone: "+33 6 12 34 56 78", email: "rssi@doctolibre.fr" },
+                { role: "Tech Lead (DSI)", name: "Responsable Technique", phone: "+33 6 87 65 43 21", email: "dsi@doctolibre.fr" },,
+                { role: "RH", name: "DRH", phone: "+33 6 00 11 22 33", email: "drh@doctolibre.fr" },
+                { role: "Services Généraux", name: "Resp. Logistique", phone: "+33 6 99 88 77 66", email: "logistique@doctolibre.fr" }
+            ],
+            external: [
+                { entity: "SOC Orange", contact: "Ligne d'urgence Analyste", phone: "+33 9 87 65 43 21", service: "Surveillance et réponse" },
+                { entity: "Hébergeur Bleu", contact: "Support Critique", phone: "+33 9 12 34 56 78", service: "Infrastructure Cloud" },
+                { entity: "Fournisseur VoIP", contact: "Support N3", phone: "+33 1 55 55 55 55", service: "Téléphonie" },
+                { entity: "ANSSI", contact: "Centre d'Alerte", phone: "0 805 693 300", service: "Notification OIV" },
+                { entity: "Police (OCLCTIC)", contact: "Permanence", phone: "17 / +33 1 00 00 00 00", service: "Dépôt de plainte" },
+                { entity: "Assurance Cyber", contact: "Cabinet A.C.M.E", phone: "+33 1 99 88 77 66", service: "Déclaration sinistre" },
+                { entity: "Cabinet d'Avocats", contact: "Me. Justice", phone: "+33 1 44 44 44 44", service: "Conseil Légal Expert" },
+                { entity: "ANSSI", contact: "Centre d'Alerte", phone: "0 805 693 300", service: "Notification OIV" },
+                { entity: "Assurance Cyber", contact: "Cabinet A.C.M.E", phone: "+33 1 99 88 77 66", service: "Déclaration sinistre" }
+            ]
+        };
+        
+        const crisisPhases = [ /* Populated in DOMContentLoaded */ ];
+        
+        const scenarioBank = {
+            "ransomware": {
+                journalEntry: "ALERTE CRITIQUE (SOC) : Rançongiciel détecté. Multiples serveurs de fichiers chiffrés. Demande de rançon reçue.",
+                actions: [
+                    { action: "Activer la cellule de crise", pilote: "RSSI", echeance: "Immédiat" },
+                    { action: "Isoler les serveurs impactés (Plan de réponse 'Ransomware')", pilote: "DSI", echeance: "Immédiat" },
+                    { action: "Qualifier la nature de la rançon (double extorsion ?)", pilote: "RSSI", echeance: "1H" },
+                    { action: "Préparer un point de situation pour le DG", pilote: "RSSI", echeance: "1H" },
+                    { action: "DÉCISION STRATÉGIQUE : NE PAS CONTACTER les attaquants", pilote: "DG", echeance: "Immédiat" }
+                ]
+            },
+            "data_breach": {
+                journalEntry: "ALERTE (DPO) : Une base de données 'clients_marketing_v2' a été retrouvée en vente sur un forum du dark web.",
+                actions: [
+                    { action: "Activer la cellule de crise", pilote: "RSSI", echeance: "Immédiat" },
+                    { action: "Confirmer l'authenticité de la fuite (analyse de l'échantillon)", pilote: "DSI", echeance: "2H" },
+                    { action: "Identifier la source de la fuite (serveur, application, backup...)", pilote: "DSI", echeance: "4H" },
+                    { action: "Préparer la notification CNIL (72H)", pilote: "DPO", echeance: "Immédiat" },
+                    { action: "Préparer une communication 'transparence' pour les utilisateurs", pilote: "Dir. Com.", echeance: "6H" }
+                ]
+            }
+        };
+
+        const injectBank = [
+            // PR & Media
+            "ÉVÉNEMENT : L'attaquant contacte le service de presse par email et menace de publier les données.",
+            "ÉVÉNEMENT : Un journaliste (Le Monde) appelle le standard pour une réaction. Il affirme avoir des preuves.",
+            "ÉVÉNEMENT : Rumeur virale sur Twitter indiquant que les données de santé de célébrités sont compromises.",
+            "ÉVÉNEMENT : Le service client est saturé d'appels de patients inquiets.",
+            // Technical & Ops
+            "ÉVÉNEMENT : Un deuxième groupe d'attaquants est détecté (attaque DDoS). Ils tentent de perturber nos efforts de remédiation.",
+            "ÉVÉNEMENT : Le DSI rapporte que les backups sont également chiffrés ou inaccessibles.",
+            "ÉVÉNEMENT : Panne du système de climatisation du Data Center principal (incident collatéral possible).",
+            "ÉVÉNEMENT : Découverte d'un compte administrateur inconnu créé il y a 3 mois.",
+            "ÉVÉNEMENT : L'antivirus a été désactivé à distance sur 50% du parc serveurs.",
+            // Legal & Compliance
+            "ÉVÉNEMENT : L'ANSSI appelle. Ils ont reçu une alerte d'une source tierce concernant notre incident.",
+            "ÉVÉNEMENT : La CNIL demande un rapport préliminaire sous 4h suite à des plaintes utilisateurs.",
+            // Third Party
+            "ÉVÉNEMENT : Le partenaire de paiement (Stripe) signale une activité suspecte et menace de bloquer les flux.",
+            "ÉVÉNEMENT : Notre hébergeur Cloud signale un trafic sortant anormal vers une IP en Russie.",
+            // Human
+            "ÉVÉNEMENT : Un administrateur système clé est injoignable (vacances sans réseau) pour la restauration.",
+            "ÉVÉNEMENT : Fuite interne : un employé a posté une photo de l'écran de crise sur Facebook."
+        ];
+
+        let journalData = [];
+        let actionPlanData = [];
+        let communicationsLog = [];
+        let actionIdCounter = 0;
+        let importedPgcContent = null;
+        
+        // Post-Crisis Data
+        let rexPointsForts = [];
+        let rexPointsFaibles = [];
+        let rexActionPlanData = [];
+        let rexActionIdCounter = 0;
+        
+        // --- SOCIAL MEDIA DATA ---
+        let socialMediaInterval = null;
+        let eventSimulationTimeout = null;
+        let socialFeedData = [];
+        const fakeUsers = [
+             { name: "Laurence Tech", handle: "@LaurenceIT_Pro", img: "layers"} ,
+             { name: "Député Numérique", handle: "@DeputeGeek", img: "award" },
+             { name: "Concurrent Santé", handle: "@DocRival_Off", img: "briefcase" },
+             { name: "Syndicat Médecins", handle: "@SyndicatMed", img: "users" }
+        ];
+        const fakeHashtags = ["#DoctoLibre", "#CyberAttaque", "#Hacked", "#SanteNumérique", "#DataLeak", "#Scandale", "#Panne", "#Urgence", "#DoctoDown", "#CyberSecurite", "#RGPD"];
+        
+        const socialTemplates = [
+            "C'est moi ou le site de @DoctoLibre est complètement HS ? 😠",
+            "Impossible de prendre RDV depuis 1h... C'est urgent ! #Panne",
+            "J'ai entendu dire qu'il y avait une fuite de données massive chez un gros acteur santé... Ça craint 😱",
+            "Encore une attaque ransomware ? Les hôpitaux, maintenant les apps... Stop !",
+            "Je viens de recevoir un mail bizarre de DoctoLibre, phishing ou pas ?",
+            "Les devs de @DoctoLibre ils sont en vacances ou quoi ? Réparez ça !!",
+            "On me confirme une cyberattaque de grande ampleur sur les serveurs de santé fr. À suivre... @ANSSI_FR",
+            "Mes données médicales sont-elles en sécurité ? J'exige des réponses ! @CNIL",
+            "Le service client ne répond pas... Silence radio inquiétant.",
+            "Wow, des bases de données médecin en vente sur le darknet ? Dites-moi que c'est fake...",
+            "Soutien aux équipes IT qui doivent être en train de suer à grosses gouttes 💻💦",
+            "C'est parti pour le retour au papier/crayon, la technologie c'est bien quand ça marche...",
+            "Maintenance non-programmée ou vrai crash ? La communication est désastreuse.",
+            "Je suis médecin et je ne peux plus accéder à mes dossiers patients !! C'est inadmissible !",
+            "Il parait que les hackers demandent 10 millions... ne payez pas ! #CyberCrime",
+            "@DoctoLibre une réaction officielle ? Le silence est assourdissant.",
+            "Si mes infos de santé sont dans la nature, je porte plainte direct",
+            "On me confirme une cyberattaque de grande ampleur sur les serveurs de santé fr. À suivre... @ANSSI_FR",
+            "Mes données médicales sont-elles en sécurité ? J'exige des réponses ! @CNIL",
+            "Le service client ne répond pas... Silence radio inquiétant.",
+            "Wow, des bases de données médecin en vente sur le darknet ? Dites-moi que c'est fake...",
+            "Soutien aux équipes IT qui doivent être en train de suer à grosses gouttes 💻💦",
+            "C'est parti pour le retour au papier/crayon, la technologie c'est bien quand ça marche...",
+            "Maintenance non-programmée ou vrai crash ? La communication est désastreuse."
+        ];
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            feather.replace();
+            updateClock();
+            setInterval(updateClock, 1000);
+
+            // Load API Key
+            const savedKey = localStorage.getItem('gemini_api_key');
+            if (savedKey) {
+                document.getElementById('api-key-input').value = savedKey;
+            }
+            
+            document.getElementById('api-key-input').addEventListener('input', (e) => {
+                localStorage.setItem('gemini_api_key', e.target.value);
+            });
+
+            // Load Model Selection
+            const savedModel = localStorage.getItem('gemini_model');
+            if (savedModel) {
+                document.getElementById('gemini-model-select').value = savedModel;
+            } else {
+                // Default to a stable model if nothing saved
+                document.getElementById('gemini-model-select').value = "gemini-2.5-flash"; 
+            }
+
+            document.getElementById('gemini-model-select').addEventListener('change', (e) => {
+                localStorage.setItem('gemini_model', e.target.value);
+            });
+
+            // Populate static data
+            const phaseData = [
+                { number: 1, name: "Détection & Qualification", icon: "search", steps: ["Un incident est détecté (SOC, admin...).", "Le RSSI est alerté et procède à une première évaluation.", "Si les critères sont remplis, le RSSI qualifie l'événement de 'crise' et en informe le DG."] },
+                { number: 2, name: "Activation & Mobilisation", icon: "phone-call", steps: ["Le Directeur de Crise active officiellement le plan.", "Le RSSI contacte et mobilise la Cellule de Crise via un canal sécurisé.", "La cellule se réunit pour le premier point de situation."] },
+                { number: 3, name: "Pilotage de la Crise", icon: "trending-up", steps: ["**Évaluation :** Que sait-on ? Que ne sait-on pas ? Impacts ? Évolution ?", "**Décision :** Le Directeur de Crise prend les décisions stratégiques.", "**Action :** Le RSSI traduit les décisions en plan d'action et assure le suivi.", "**Points de situation :** Réunions régulières pour ajuster la stratégie."] },
+                { number: 4, name: "Communication de Crise", icon: "radio", steps: ["Toute communication est validée par le Directeur de Crise.", "Le Responsable Communication prépare les éléments de langage.", "Le DPO et le RSSI préparent les notifications aux autorités (ANSSI, CNIL)."] },
+                { number: 5, name: "Sortie de Crise & Retour à la Normale", icon: "rotate-cw", steps: ["La sortie de crise est déclarée par le Directeur de Crise.", "La Cellule de Crise est dissoute.", "Les équipes techniques procèdent à la reconstruction et au durcissement des systèmes."] }
+            ];
+            crisisPhases.push(...phaseData);
+
+            // Fill empty tab contents
+            populateTabContent('plan-action', `<h2 class="text-2xl font-bold mb-6 text-gray-800">Plan d'Action Opérationnel</h2><div class="bg-white p-6 rounded-lg mb-8 border border-gray-200 shadow-sm"><h3 class="font-semibold mb-4 text-gray-700">Nouvelle Action</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end"><div class="col-span-1 md:col-span-3"><label for="action-text" class="block text-sm font-medium text-gray-600">Action requise</label><input type="text" id="action-text" class="mt-1 w-full bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"></div><div><label for="action-pilot" class="block text-sm font-medium text-gray-600">Pilote</label><select id="action-pilot" class="mt-1 w-full bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"></select></div><div><label for="action-deadline" class="block text-sm font-medium text-gray-600">Échéance</label><input type="text" id="action-deadline" placeholder="Ex: Immédiat, 15:30" class="mt-1 w-full bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"></div><button id="add-action-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-md flex items-center justify-center shadow-sm"><i data-feather="plus" class="h-5 w-5 mr-2"></i> Ajouter</button></div></div><div class="overflow-x-auto rounded-lg border border-gray-200"><table class="w-full text-sm text-left text-gray-600"><thead class="text-xs text-gray-700 uppercase bg-gray-100"><tr><th scope="col" class="px-6 py-3">Action</th><th scope="col" class="px-6 py-3">Pilote</th><th scope="col" class="px-6 py-3">Échéance</th><th scope="col" class="px-6 py-3 w-48">Statut</th></tr></thead><tbody id="action-plan-table-body" class="bg-white"></tbody></table></div>`);
+            populateTabContent('journal', `<h2 class="text-2xl font-bold mb-6 text-gray-800">Journal de Crise (Main Courante)</h2><div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm"><div class="flex space-x-4"><input type="text" id="journal-entry-input" class="flex-1 bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ajouter une entrée..."><button id="add-journal-entry-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-md flex items-center shadow-sm"><i data-feather="plus" class="h-5 w-5 mr-2"></i> Ajouter</button></div><div id="journal-entries-container" class="mt-6 border-t border-gray-200 pt-6"><h3 class="font-semibold mb-4 text-gray-700">Entrées du journal :</h3><div id="journal-entries" class="space-y-4"></div></div></div>`);
+            populateTabContent('cellule', `<h2 class="text-2xl font-bold mb-6 text-gray-800">Composition de la Cellule de Crise</h2><div id="cellule-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div>`);
+            populateTabContent('communications', `<h2 class="text-2xl font-bold mb-6 text-gray-800">Communications de Crise</h2><div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm"><div class="flex items-center justify-between mb-4"><div><label for="comm-target" class="block text-sm font-medium text-gray-600 mb-1">Cible</label><select id="comm-target" class="bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"><option>Interne (Collaborateurs)</option><option>Externe (Utilisateurs)</option><option>Externe (Presse)</option><option>Externe (Autorités)</option></select></div><button id="open-comm-modal-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-md flex items-center justify-center disabled:opacity-50 shadow-sm" disabled><i data-feather="plus-circle" class="h-5 w-5 mr-2"></i> Rédiger une Communication</button></div></div><div id="comm-log-container" class="mt-8"><h3 class="text-lg font-semibold mb-4 text-gray-700">Historique des Communications Validées</h3><div id="comm-log" class="space-y-4"><p class="text-sm text-gray-500 italic">Aucune communication validée.</p></div></div>`);
+            populateTabContent('annuaire', `<h2 class="text-2xl font-bold mb-6 text-gray-800">Annuaire de Crise</h2><div><h3 class="text-xl font-semibold mb-4 text-blue-600">Contacts Internes</h3><div id="internal-contacts" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div></div><div class="mt-8"><h3 class="text-xl font-semibold mb-4 text-amber-600">Contacts Externes</h3><div id="external-contacts" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div></div>`);
+            populateTabContent('phases', `<h2 class="text-2xl font-bold mb-6 text-gray-800">Phases de la Gestion de Crise</h2><div id="phases-container" class="space-y-8"></div>`);
+            
+            
+            // Populate dynamic content
+            populateCrisisTeam();
+            populateCrisisPhases();
+            populateDirectory();
+            populatePilotSelect('action-pilot');
+            setupTabs();
+            setupEventListeners();
+            renderActionPlan();
+        });
+        
+        // --- DYNAMIC CONTENT POPULATION ---
+         function populateTabContent(tabId, content) {
+            const tab = document.getElementById(tabId);
+            if (tab) {
+                tab.innerHTML = content;
+            }
+        }
+        
+        function populateCrisisTeam() {
+            const container = document.getElementById('cellule-grid');
+            if (!container) return;
+            container.innerHTML = crisisTeam.map(member => `<div class="bg-white rounded-lg p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex items-center mb-3"><i data-feather="${member.icon}" class="h-6 w-6 text-${member.color}-600 mr-3"></i><h3 class="text-lg font-bold text-${member.color}-700">${member.role}</h3></div>
+                    <div class="mb-4"><p class="text-sm text-gray-600"><strong>Titulaire :</strong> ${member.primary}</p><p class="text-sm text-gray-500"><strong>Suppléant :</strong> ${member.deputy}</p></div>
+                    <ul class="text-sm text-gray-600 space-y-2 list-disc list-inside">${member.missions.map(mission => `<li>${mission}</li>`).join('')}</ul>
+                </div>`).join('');
+            feather.replace();
+        }
+
+        function populateCrisisPhases() {
+            const container = document.getElementById('phases-container');
+            if (!container) return;
+            container.innerHTML = crisisPhases.map(phase => `
+                <div class="flex">
+                    <div class="flex flex-col items-center mr-6">
+                        <div class="flex items-center justify-center bg-blue-600 rounded-full h-12 w-12 text-white shadow-sm"><i data-feather="${phase.icon}" class="h-6 w-6"></i></div>
+                        ${phase.number < crisisPhases.length ? '<div class="w-px h-full bg-gray-300"></div>' : ''}
+                    </div>
+                    <div class="flex-1 bg-white p-6 rounded-lg border border-gray-200 shadow-sm"><h3 class="text-xl font-bold mb-3 text-blue-700">Phase ${phase.number}: ${phase.name}</h3><ul class="text-gray-600 space-y-2 list-disc list-inside">${phase.steps.map(step => `<li>${step.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</li>`).join('')}</ul></div>
+                </div>`).join('');
+            feather.replace();
+        }
+
+        function populateDirectory() {
+            const internalContainer = document.getElementById('internal-contacts');
+            const externalContainer = document.getElementById('external-contacts');
+            if (!internalContainer || !externalContainer) return;
+            internalContainer.innerHTML = crisisDirectory.internal.map(c => `<div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                <p class="font-bold text-blue-700">${c.role} - ${c.name}</p>
+                <p class="text-sm text-gray-600"><i data-feather="phone-call" class="inline h-4 w-4 mr-2"></i>${c.phone}</p>
+                <p class="text-sm text-gray-600"><i data-feather="mail" class="inline h-4 w-4 mr-2"></i>${c.email}</p>
+            </div>`).join('');
+            externalContainer.innerHTML = crisisDirectory.external.map(c => `<div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                <p class="font-bold text-amber-600">${c.entity} (${c.contact})</p>
+                <p class="text-sm text-gray-600"><i data-feather="phone-call" class="inline h-4 w-4 mr-2"></i>${c.phone}</p>
+                 <p class="text-xs text-gray-500 mt-1">${c.service}</p>
+            </div>`).join('');
+            feather.replace();
+        }
+
+        function populatePilotSelect(selectId) {
+            const select = document.getElementById(selectId);
+            if (!select) return;
+            select.innerHTML = crisisTeam.map(m => `<option value="${m.name}">${m.role} (${m.name})</option>`).join('');
+        }
+
+        // --- NEW/MODIFIED MODULES (Scenario & Inject) ---
+        function handleScenarioChange(event) {
+            const selected = event.target.value;
+            const uploader = document.getElementById('pgc-uploader');
+            const aiDifficulty = document.getElementById('ai-difficulty-container');
+            const genButton = document.getElementById('prepare-scenario-btn');
+            
+            uploader.classList.add('hidden');
+            aiDifficulty.classList.add('hidden');
+            genButton.disabled = false;
+            
+            if (selected === 'pgc_custom') {
+                uploader.classList.remove('hidden');
+                genButton.textContent = 'Générer via PGC';
+                genButton.disabled = importedPgcContent === null;
+            } else if (selected === 'generate_ai') {
+                aiDifficulty.classList.remove('hidden');
+                genButton.textContent = 'Générer le Scénario IA';
+            } else {
+                genButton.textContent = 'Préparer le Scénario';
+            }
+            feather.replace();
+        }
+
+        function prepareScenario() {
+            const selected = document.getElementById('scenario-select').value;
+            const genStatus = document.getElementById('generation-status');
+            
+            actionPlanData = []; // Clear previous actions
+            journalData = []; // Clear previous journal
+
+            if (selected === 'pgc_custom') {
+                generateActionsFromPgc();
+            } else if (selected === 'generate_ai') { 
+                generateScenarioAI();
+            } else if (selected !== 'vierge') {
+                const scenario = scenarioBank[selected];
+                if (scenario) {
+                    scenario.actions.forEach(item => {
+                        actionPlanData.push({
+                            id: actionIdCounter++,
+                            text: item.action,
+                            pilot: item.pilote,
+                            deadline: item.echeance,
+                            status: 'À faire'
+                        });
+                    });
+                    addJournalEntry(scenario.journalEntry, 'inject'); // Add initial alert as an inject
+                    genStatus.textContent = `Scénario '${selected}' chargé.`;
+                }
+            } else {
+                // Scénario Vierge
+                genStatus.textContent = 'Scénario vierge prêt.';
+            }
+            renderActionPlan();
+            updateJournalUI();
+        }
+
+
+        async function generateScenarioAI() {
+            const genButton = document.getElementById('prepare-scenario-btn');
+            const genStatus = document.getElementById('generation-status');
+            const difficultySelect = document.getElementById('scenario-difficulty');
+            const difficulty = difficultySelect.value;
+            
+            genButton.disabled = true;
+            genStatus.innerHTML = `<div class="flex items-center justify-center"><div class="spinner w-4 h-4 border-2 rounded-full mr-2"></div>Génération IA en cours (${difficulty})...</div>`;
+
+            let difficultyPrompt = "";
+            switch(difficulty) {
+                case 'facile': difficultyPrompt = "Niveau FACILE : Menace connue, impact limité, procédures standards suffisent, pas de fuite de données majeure."; break;
+                case 'moyen': difficultyPrompt = "Niveau MOYEN : Menace sérieuse, quelques complications techniques ou médiatiques, pression modérée."; break;
+                case 'difficile': difficultyPrompt = "Niveau DIFFICILE : Attaque sophistiquée (APT), multiples vecteurs, pression médiatique forte, impact métier critique."; break;
+                case 'cauchemar': difficultyPrompt = "Niveau CAUCHEMAR : Compromission totale, menaces vitales (santé patients), fuite massive, panique interne."; break;
+            }
+
+            const prompt = `Vous êtes le "Game Master" d'une simulation de crise cyber pour un OIV de santé (DoctoLibre).
+            
+            Votre mission : Créer un scénario de crise complet, réaliste et sur-mesure.
+            ${difficultyPrompt}
+            
+            Générez une réponse au format JSON STRICT (sans texte autour) avec la structure suivante :
+            {
+                "title": "Titre du scénario",
+                "journalEntry": "Le premier message d'alerte critique qui arrive au journal pour lancer la crise (ex: Appel du SOC, Email de revendication, Alerte DPO...)",
+                "actions": [
+                    { "action": "Action recommandée 1", "pilote": "RSSI / DSI / DG / DPO / Dir. Com.", "echeance": "Immédiat / 1H / 2H" },
+                    { "action": "Action recommandée 2", "pilote": "...", "echeance": "..." }
+                ]
+            }
+            
+            Le scénario doit être cohérent avec le niveau de difficulté demandé. Générez 5 à 8 actions initiales pertinentes.`;
+
+            const apiKey = document.getElementById('api-key-input').value || localStorage.getItem('gemini_api_key');
+            if (!apiKey) {
+                genStatus.textContent = "Erreur : Clé API manquante. Saisissez-la en haut à droite.";
+                genButton.disabled = false;
+                return;
+            }
+            
+            const selectedModel = document.getElementById('gemini-model-select').value || 'gemini-1.5-flash';
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+
+                const result = await response.json();
+                if (!response.ok) { 
+                    const errorMsg = result?.error?.message || `Erreur HTTP ${response.status}`;
+                    throw new Error(errorMsg);
+                }
+                let jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!jsonText) { 
+                    throw new Error("Réponse vide de l'API.");
+                }
+                jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+                
+                 try {
+                    const scenarioData = JSON.parse(jsonText);
+                    
+                    // Apply Scenario
+                    actionPlanData = [];
+                    if (scenarioData.actions && Array.isArray(scenarioData.actions)) {
+                         scenarioData.actions.forEach(item => {
+                            actionPlanData.push({
+                                id: actionIdCounter++,
+                                text: item.action,
+                                pilot: item.pilote || 'N/A',
+                                deadline: item.echeance || 'Immédiat',
+                                status: 'À faire'
+                            });
+                        });
+                    }
+                    
+                    // Clear Previous
+                    journalData = [];
+                    
+                    addJournalEntry(`SCÉNARIO IA (${difficulty.toUpperCase()}) : ${scenarioData.title || 'Généré par IA'}`, 'system');
+                    if (scenarioData.journalEntry) {
+                        addJournalEntry(scenarioData.journalEntry, 'inject');
+                    }
+                    
+                    renderActionPlan();
+                    updateJournalUI();
+                    genStatus.textContent = 'Scénario IA prêt !';
+
+                } catch (parseError) {
+                    console.error("Erreur de parsing JSON:", parseError, "Texte reçu:", jsonText);
+                    throw new Error("Format JSON invalide reçu de l'IA.");
+                }
+
+            } catch (error) {
+                console.error("Erreur Gemini:", error);
+                let userMsg = error.message;
+                 if (userMsg.includes('429')) userMsg = "Quota dépassé (429). Changez de modèle.";
+                genStatus.innerHTML = `<span class="text-red-400">Erreur : ${userMsg}</span>`;
+            } finally {
+                genButton.disabled = false;
+            }
+        }
+
+        async function injectRandomEvent() {
+            // Chance d'utiliser Gemini pour un inject contextuel (si clé API présente)
+            const apiKey = document.getElementById('api-key-input').value || localStorage.getItem('gemini_api_key');
+            // 60% de chance d'utiliser l'IA si dispo, pour varier avec les injects "classiques"
+            const useGemini = apiKey && Math.random() > 0.4; 
+
+            if (useGemini) {
+                try {
+                    await generateGeminiInject();
+                } catch (e) {
+                    console.warn("Gemini inject failed, falling back to static bank", e);
+                    injectFromBank();
+                }
+            } else {
+                injectFromBank();
+            }
+        }
+
+        function injectFromBank() {
+            if (injectBank.length === 0) return;
+            // Éviter de répéter le même inject trop souvent pourrait être une amélioration future
+            const randomIndex = Math.floor(Math.random() * injectBank.length);
+            const injectText = injectBank[randomIndex];
+            addJournalEntry(injectText, 'inject');
+        }
+
+        async function generateGeminiInject() {
+            const journalContext = journalData.slice(-10).map(entry => `${entry.timestamp.toISOString()} - ${entry.text}`).join('\n');
+            const scenario = document.getElementById('scenario-select').value;
+            
+            const prompt = `Vous êtes le "Maître du Jeu" d'une simulation de crise cyber pour l'entreprise de santé DoctoLibre.
+            Scénario en cours : ${scenario}.
+            
+            Derniers événements du journal :
+            ---
+            ${journalContext}
+            ---
+
+            Générez un NOUVEL événement inattendu (inject) pour compliquer la situation ou faire avancer le scénario.
+            L'événement doit être court (une phrase), réaliste, et différent des précédents.
+            Types d'événements possibles : technique (panne, découverte), médiatique (journaliste, fuite), juridique (CNIL, Police), humain (fatigue, erreur), social.
+            
+            Commencez impérativement la phrase par "ÉVÉNEMENT : ". Ne mettez pas de guillemets.`;
+
+             const apiKey = document.getElementById('api-key-input').value || localStorage.getItem('gemini_api_key');
+             const selectedModel = document.getElementById('gemini-model-select').value || 'gemini-1.5-flash';
+             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+
+             const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+
+            const result = await response.json();
+            if (!response.ok) throw new Error(result?.error?.message || "API Error");
+            
+            let injectText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (injectText) {
+                injectText = injectText.trim();
+                // Ensure prefix standardisation
+                if (!injectText.toUpperCase().startsWith("ÉVÉNEMENT :")) {
+                    injectText = "ÉVÉNEMENT : " + injectText;
+                }
+                addJournalEntry(injectText, 'inject');
+            } else {
+                throw new Error("No text generated");
+            }
+        }
+
+        function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                importedPgcContent = null;
+                document.getElementById('file-name-display').textContent = '';
+                document.getElementById('prepare-scenario-btn').disabled = true;
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                importedPgcContent = e.target.result;
+                document.getElementById('file-name-display').textContent = file.name;
+                document.getElementById('prepare-scenario-btn').disabled = false;
+                document.getElementById('generation-status').textContent = '';
+            };
+            reader.onerror = () => {
+                importedPgcContent = null;
+                document.getElementById('file-name-display').textContent = 'Erreur de lecture du fichier';
+                document.getElementById('prepare-scenario-btn').disabled = true;
+            };
+            reader.readAsText(file);
+        }
+
+        async function generateActionsFromPgc() {
+            if (!importedPgcContent) return;
+            const genButton = document.getElementById('prepare-scenario-btn');
+            const genStatus = document.getElementById('generation-status');
+            genButton.disabled = true;
+            genStatus.innerHTML = `<div class="flex items-center justify-center"><div class="spinner w-4 h-4 border-2 rounded-full mr-2"></div>Analyse en cours...</div>`;
+            
+            const prompt = `Vous êtes un expert en gestion de crise cyber, spécialisé dans la création de plans d'action opérationnels pour des OIV du secteur de la santé.
+            
+            Voici le Plan de Gestion de Crise (PGC) d'une entreprise :
+            ---
+            ${importedPgcContent}
+            ---
+
+            Analysez ce plan et générez une liste de 5 à 7 actions opérationnelles de base qui devraient être lancées immédiatement au déclenchement d'une crise. Concentrez-vous sur l'activation de la cellule, les premières investigations techniques, la qualification de la situation et la préparation des communications. Ne soyez pas trop générique.
+
+            Votre réponse DOIT être un JSON valide, et uniquement un JSON. Le format doit être un tableau d'objets : \`[{"action": "Description de l'action", "pilote": "...", "echeance": "..."}]\`.
+            Pour le champ 'pilote', choisissez le rôle le plus pertinent parmi cette liste : DG, RSSI, DSI, DPO, Dir. Com.`;
+            
+            const apiKey = document.getElementById('api-key-input').value || localStorage.getItem('gemini_api_key');
+            if (!apiKey) {
+                genStatus.textContent = "Erreur : Clé API manquante. Saisissez-la en haut à droite.";
+                genButton.disabled = false;
+                return;
+            }
+            
+            const selectedModel = document.getElementById('gemini-model-select').value || 'gemini-1.5-flash';
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+
+                const result = await response.json();
+                if (!response.ok) { 
+                    const errorMsg = result?.error?.message || `Erreur HTTP ${response.status}`;
+                    throw new Error(errorMsg);
+                }
+                let jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!jsonText) { 
+                    throw new Error("Réponse vide de l'API.");
+                }
+                jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+                try {
+                    const generatedActions = JSON.parse(jsonText);
+                    if (Array.isArray(generatedActions)) {
+                        actionPlanData = []; // Clear
+                        generatedActions.forEach(item => {
+                            actionPlanData.push({
+                                id: actionIdCounter++,
+                                text: item.action || 'Action non définie',
+                                pilot: item.pilote || 'N/A',
+                                deadline: item.echeance || 'Immédiat',
+                                status: 'À faire'
+                            });
+                        });
+                        renderActionPlan();
+                        addJournalEntry(`${generatedActions.length} actions ont été générées depuis le PGC importé.`, 'system');
+                        genStatus.textContent = 'Plan d\'action généré !';
+                    } else {
+                        throw new Error('Le format JSON reçu n\'est pas un tableau.');
+                    }
+                } catch (parseError) {
+                    console.error("Erreur de parsing JSON:", parseError, "Texte reçu:", jsonText);
+                    throw new Error("La réponse de l'API n'est pas un JSON valide.");
+                }
+            } catch (error) {
+                console.error("Erreur Gemini:", error);
+                let userMsg = error.message;
+                if (userMsg.includes('429')) userMsg = "Quota dépassé (429). Changez de modèle (ex: 1.5 Flash) ou attendez.";
+                if (userMsg.includes('400')) userMsg = "Clé API invalide ou modèle indisponible (400).";
+                
+                genStatus.innerHTML = `<span class="text-red-400">Erreur : ${userMsg}</span>`;
+            } finally {
+                genButton.disabled = false;
+            }
+        }
+
+
+        function addAction() {
+            const textInput = document.getElementById('action-text');
+            const pilotInput = document.getElementById('action-pilot');
+            const deadlineInput = document.getElementById('action-deadline');
+            if (textInput.value.trim() === '') return;
+            actionPlanData.push({
+                id: actionIdCounter++,
+                text: textInput.value.trim(),
+                pilot: pilotInput.value,
+                deadline: deadlineInput.value.trim() || 'N/A',
+                status: 'À faire'
+            });
+            renderActionPlan();
+            textInput.value = '';
+            deadlineInput.value = '';
+            addJournalEntry(`Nouvelle action ajoutée : "${textInput.value.trim()}" (Pilote: ${pilotInput.value})`, 'system');
+        }
+
+        function renderActionPlan() {
+            const tbody = document.getElementById('action-plan-table-body');
+            if (!tbody) return;
+            const statusColors = {
+                'À faire': 'bg-gray-100 text-gray-800 border-gray-200 border',
+                'En cours': 'bg-amber-100 text-amber-800 border-amber-200 border animate-pulse',
+                'Terminé': 'bg-green-100 text-green-800 border-green-200 border',
+                'Bloqué': 'bg-red-100 text-red-800 border-red-200 border',
+            };
+            if (actionPlanData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">Aucune action définie.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = actionPlanData.map(action => `
+                <tr class="bg-white border-b border-gray-200 hover:bg-gray-50">
+                    <td class="px-6 py-4 font-medium text-gray-900">${action.text}</td>
+                    <td class="px-6 py-4">${action.pilot}</td>
+                    <td class="px-6 py-4">${action.deadline}</td>
+                    <td class="px-6 py-4">
+                        <select class="action-status-select bg-gray-50 border border-gray-300 rounded-md p-1.5 text-gray-800 w-full focus:ring-2 focus:ring-blue-500" data-id="${action.id}">
+                            ${Object.keys(statusColors).map(s => `<option value="${s}" ${s === action.status ? 'selected' : ''}>${s}</option>`).join('')}
+                        </select>
+                        <span class="status-badge mt-2 ${statusColors[action.status]}">${action.status}</span>
+                    </td>
+                </tr>`).join('');
+            
+            document.querySelectorAll('.action-status-select').forEach(select => {
+                select.addEventListener('change', (e) => updateActionStatus(parseInt(e.target.dataset.id), e.target.value));
+            });
+        }
+
+        function updateActionStatus(id, newStatus) {
+            const action = actionPlanData.find(a => a.id === id);
+            if (action) {
+                const oldStatus = action.status;
+                action.status = newStatus;
+                addJournalEntry(`Statut de l'action "${action.text}" changé de '${oldStatus}' à '${newStatus}'`, 'system');
+                renderActionPlan();
+            }
+        }
+        
+        async function generateCommunication() {
+            if (!crisisStartTime) return;
+            const genButton = document.getElementById('generate-comm-btn-modal');
+            const genStatus = document.getElementById('comm-generation-status-modal');
+            const messageTextarea = document.getElementById('comm-message-modal');
+            const target = document.getElementById('comm-target').value;
+            
+            genButton.disabled = true;
+            genStatus.innerHTML = `<div class="flex items-center justify-center"><div class="spinner w-4 h-4 border-2 rounded-full mr-2"></div>Génération en cours...</div>`;
+            messageTextarea.value = '';
+
+            const journalLog = journalData.map(entry => `- ${entry.text}`).join('\n');
+
+            const prompt = `Vous êtes l'expert en communication de crise pour un OIV français de la santé (DoctoLibre).
+            Une crise cyber est en cours.
+            La cible de la communication est : ${target}.
+            Voici le journal des événements :
+            ---
+            ${journalLog}
+            ---
+            Rédigez une proposition de communication claire, factuelle et adaptée à la cible. Votre réponse doit être uniquement le texte du message.`;
+            
+            const apiKey = document.getElementById('api-key-input').value || localStorage.getItem('gemini_api_key');
+            if (!apiKey) {
+                genStatus.textContent = "Erreur : Clé API manquante. Saisissez-la en haut à droite.";
+                genButton.disabled = false;
+                return;
+            }
+
+            const selectedModel = document.getElementById('gemini-model-select').value || 'gemini-1.5-flash';
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                const result = await response.json();
+                if (!response.ok) { 
+                    throw new Error(result?.error?.message || `Erreur HTTP ${response.status}`);
+                }
+                const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (generatedText) {
+                    messageTextarea.value = generatedText;
+                    genStatus.textContent = 'Proposition générée.';
+                } else { 
+                    throw new Error("Réponse vide de l'API.");
+                }
+            } catch(error) {
+                console.error("Erreur Gemini:", error);
+                let userMsg = error.message;
+                if (userMsg.includes('429')) userMsg = "Quota dépassé (429). Changez de modèle (ex: 1.5 Flash) ou attendez.";
+                if (userMsg.includes('400')) userMsg = "Clé API invalide ou modèle indisponible (400).";
+
+                genStatus.innerHTML = `<span class="text-red-400">Erreur : ${userMsg}</span>`;
+            } finally {
+                genButton.disabled = false;
+            }
+        }
+
+
+        function logCommunication() {
+            const target = document.getElementById('comm-target').value;
+            const message = document.getElementById('comm-message-modal').value;
+            if (message.trim() === '') return;
+            communicationsLog.push({
+                timestamp: new Date(),
+                target,
+                message
+            });
+            renderCommunicationsLog();
+            addJournalEntry(`Communication validée pour [${target}]: "${message.substring(0, 50)}..."`, 'system');
+            document.getElementById('comm-modal').classList.add('hidden');
+        }
+
+        function renderCommunicationsLog() {
+            const container = document.getElementById('comm-log');
+            if (!container) return;
+            if (communicationsLog.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-500 italic">Aucune communication validée.</p>';
+                return;
+            }
+            container.innerHTML = communicationsLog.map(log => `
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-green-600">Cible: ${log.target}</span>
+                        <span class="text-xs text-gray-500">${log.timestamp.toLocaleString('fr-FR')}</span>
+                    </div>
+                    <p class="text-sm text-gray-800 whitespace-pre-wrap">${log.message}</p>
+                </div>
+            `).join('');
+        }
+        
+        // --- EVENT LISTENERS & UI LOGIC ---
+        function setupEventListeners() {
+            document.getElementById('declare-crisis-btn').addEventListener('click', declareCrisis);
+            document.getElementById('end-crisis-btn').addEventListener('click', endCrisis);
+            document.getElementById('reset-app-btn').addEventListener('click', () => location.reload());
+            document.getElementById('get-advice-btn').addEventListener('click', getGeminiAdvice);
+            document.getElementById('add-journal-entry-btn').addEventListener('click', () => addJournalEntry('normal'));
+            document.getElementById('journal-entry-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') addJournalEntry('normal'); });
+            document.getElementById('add-action-btn').addEventListener('click', addAction);
+            
+            // Communication Modal
+            document.getElementById('open-comm-modal-btn').addEventListener('click', () => {
+                document.getElementById('comm-modal-target').textContent = document.getElementById('comm-target').value;
+                document.getElementById('comm-message-modal').value = '';
+                document.getElementById('comm-generation-status-modal').textContent = '';
+                document.getElementById('comm-modal').classList.remove('hidden');
+            });
+            document.getElementById('close-comm-modal-btn').addEventListener('click', () => document.getElementById('comm-modal').classList.add('hidden'));
+            document.getElementById('generate-comm-btn-modal').addEventListener('click', generateCommunication);
+            document.getElementById('log-comm-btn-modal').addEventListener('click', logCommunication);
+
+            // Scenarios
+            document.getElementById('scenario-select').addEventListener('change', handleScenarioChange);
+            document.getElementById('pgc-importer').addEventListener('change', handleFileImport);
+            document.getElementById('prepare-scenario-btn').addEventListener('click', prepareScenario);
+        }
+
+        let crisisStartTime = null;
+        let timerInterval = null;
+
+        function setupTabs() {
+            const tabs = document.querySelectorAll('.tab-button');
+            const contents = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => {
+                tab.classList.add('text-sm', 'font-medium', 'py-2', 'px-4', 'rounded-md', 'border', 'border-transparent');
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    contents.forEach(content => content.classList.add('hidden'));
+                    const tabId = tab.dataset.tab;
+                    const tabToShow = document.getElementById(tabId);
+                    if (tabToShow) {
+                        tabToShow.classList.remove('hidden');
+                    }
+                });
+            });
+        }
+        function declareCrisis() {
+            if (crisisStartTime) return;
+            crisisStartTime = new Date();
+            document.getElementById('crisis-status').textContent = 'Crise en cours';
+            document.getElementById('crisis-status').classList.remove('text-green-400');
+            document.getElementById('crisis-status').classList.add('text-red-400');
+            document.getElementById('crisis-status-container').classList.add('crisis-declared');
+            document.getElementById('crisis-timer').classList.remove('hidden');
+            document.getElementById('declare-crisis-btn').disabled = true;
+            document.getElementById('end-crisis-btn').classList.remove('hidden');
+            document.getElementById('get-advice-btn').disabled = false;
+            document.getElementById('open-comm-modal-btn').disabled = false;
+            
+            // Hide preparation, show simulation
+            document.getElementById('pgc-importer-container').classList.add('hidden');
+            const simEngine = document.getElementById('simulation-engine-container');
+            simEngine.classList.remove('hidden');
+            simEngine.querySelector('#inject-event-btn').addEventListener('click', injectRandomEvent);
+
+            timerInterval = setInterval(updateTimer, 1000);
+            addJournalEntry('DECLARATION DE CRISE', 'system');
+            
+            // Start Social Feed
+            document.getElementById('social-media-container').classList.remove('hidden');
+            startSocialMediaSimulation();
+            startEventSimulation();
+        }
+        
+        function addJournalEntry(text = null, type = 'normal') { // type: 'normal', 'system', 'inject'
+            const input = document.getElementById('journal-entry-input');
+            if (!input && appMode === 'crisis') return; // Failsafe
+            
+            let entryText = text;
+            if (type === 'normal') {
+                entryText = input.value.trim();
+                if (entryText === '') return;
+            }
+            
+            const timestamp = new Date();
+            journalData.push({ timestamp, text: entryText, type: type });
+            updateJournalUI();
+            
+            if (type === 'normal' && crisisStartTime && appMode === 'crisis') {
+                getGeminiAdvice();
+            }
+            if (type === 'normal') {
+              input.value = '';
+              input.focus();
+            }
+        }
+
+        function updateJournalUI() {
+            const entriesContainer = document.getElementById('journal-entries');
+            if (!entriesContainer) return;
+            entriesContainer.innerHTML = '';
+            [...journalData].reverse().forEach(entry => {
+                const entryDiv = document.createElement('div');
+                entryDiv.className = 'relative pl-4 border-l-2 border-gray-300 pb-4';
+                
+                let textClass = 'text-gray-800';
+                if (entry.type === 'system') {
+                    textClass = 'journal-entry-system';
+                } else if (entry.type === 'inject') {
+                    textClass = 'journal-entry-inject';
+                }
+                
+                entryDiv.innerHTML = `
+                    <div class="absolute -left-2 top-1.5 w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-sm"></div>
+                    <div class="text-xs text-gray-500">${entry.timestamp.toLocaleTimeString('fr-FR')}</div>
+                    <p class="${textClass}">${entry.text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+                `;
+                entriesContainer.appendChild(entryDiv);
+            });
+        }
+        async function getGeminiAdvice() {
+            const adviceContainer = document.getElementById('gemini-advice-container');
+            const adviceBtn = document.getElementById('get-advice-btn');
+            if (adviceBtn) adviceBtn.disabled = true;
+
+            if (adviceContainer) {
+                adviceContainer.innerHTML = `<div class="flex items-center text-sm text-gray-600"><div class="spinner w-4 h-4 border-2 rounded-full mr-2"></div>Analyse en cours...</div>`;
+            } else {
+                return;
+            }
+            
+            const journalLog = journalData.map(entry => `${entry.timestamp.toISOString()} - ${entry.text}`).join('\n');
+            const socialFeedText = socialFeedData.slice(-3).map(t => t.text).join(" // ");
+
+            const prompt = `Vous êtes un expert en gestion de crise cybersécurité pour un OIV français dans le secteur de la santé (DoctoLibre). Une crise est en cours.
+            
+            Voici la chronologie des événements :
+            ---
+            ${journalLog}
+            ---
+            
+            Voici les derniers bruits sur les réseaux sociaux (Contexte de pression) :
+            "${socialFeedText}"
+            
+            Fournissez 3 recommandations stratégiques, concises et priorisées pour la cellule de crise. Concentrez-vous sur les décisions stratégiques, la communication (pour calmer les rumeurs), et les obligations réglementaires (ANSSI, CNIL). Formatez en liste à puces.`;
+
+            const apiKey = document.getElementById('api-key-input').value || localStorage.getItem('gemini_api_key');
+            if (!apiKey) {
+                adviceContainer.innerHTML = '<p class="text-sm text-red-400">Erreur : Clé API manquante. Saisissez-la en haut à droite.</p>';
+                adviceBtn.disabled = false;
+                return;
+            }
+            
+            const selectedModel = document.getElementById('gemini-model-select').value || 'gemini-1.5-flash';
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+
+                if (!response.ok) throw new Error(`API error: ${response.status}`);
+                const result = await response.json();
+                const adviceText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (adviceText) {
+                    adviceContainer.innerHTML = adviceText
+                        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-blue-700">$1</strong>')
+                        .replace(/\* (.*?)(?:\n|$)/g, '<li class="mb-2 text-sm">$1</li>')
+                        .replace(/<li/g, '<ul class="list-disc list-inside text-gray-700"> <li');
+                } else {
+                    throw new Error("Réponse de l'API invalide.");
+                }
+
+            } catch (error) {
+                console.error("Erreur Gemini API:", error);
+                
+                let userMsg = error.message;
+                if (userMsg.includes('429')) userMsg = "Quota dépassé (429). Changez de modèle (ex: 1.5 Flash) ou attendez.";
+                if (userMsg.includes('400')) userMsg = "Clé API invalide ou modèle indisponible (400).";
+                
+                adviceContainer.innerHTML = `<p class="text-sm text-red-500 font-bold">Erreur : ${userMsg}</p>`;
+            } finally {
+                adviceBtn.disabled = false;
+            }
+        }
+        
+        // --- POST-CRISIS FUNCTIONS ---
+        
+        function endCrisis() {
+            if (appMode === 'post-crisis') return;
+            appMode = 'post-crisis';
+            
+            addJournalEntry('FIN DE LA CRISE - Passage en Mode Post-Crise (REX)', 'system');
+            clearInterval(timerInterval);
+            
+            document.getElementById('crisis-status').textContent = 'Post-Crise (REX)';
+            document.getElementById('crisis-status').classList.remove('text-red-400', 'crisis-declared');
+            document.getElementById('crisis-status').classList.add('text-blue-400');
+            document.getElementById('crisis-status-container').classList.add('post-crisis-mode');
+
+            document.getElementById('end-crisis-btn').classList.add('hidden');
+            document.getElementById('declare-crisis-btn').classList.add('hidden');
+            document.getElementById('reset-app-btn').classList.remove('hidden');
+            
+            setupPostCrisisMode();
+        }
+
+        function setupPostCrisisMode() {
+            // Stop Social Feed
+            stopEventSimulation();
+            stopSocialMediaSimulation();
+            document.getElementById('social-media-container').classList.add('hidden');
+
+            // 1. Change Sidebar
+            document.getElementById('pgc-importer-container').classList.add('hidden');
+            document.getElementById('simulation-engine-container').classList.add('hidden');
+            document.getElementById('gemini-advisor-container').innerHTML = '<h3 class="text-lg font-semibold text-gray-700 mb-4 border-b border-gray-200 pb-2">Mode Post-Crise</h3><p class="text-sm text-gray-500 italic">Analyse de la crise terminée. Concentrez-vous sur le REX et le plan d action correctif.</p>';
+
+            // 2. Change Tabs
+            const tabNav = document.getElementById('tabs-nav');
+            tabNav.innerHTML = `
+                <button class="tab-button active pb-3 px-2 text-sm font-medium" data-tab="rex-analyse"><i data-feather="search" class="inline-block h-4 w-4 mr-1"></i>Analyse REX</button>
+                <button class="tab-button pb-3 px-2 text-sm font-medium" data-tab="rex-plan-action"><i data-feather="list" class="inline-block h-4 w-4 mr-1"></i>Plan d'Action REX</button>
+                <button class="tab-button pb-3 px-2 text-sm font-medium" data-tab="journal"><i data-feather="book-open" class="inline-block h-4 w-4 mr-1"></i>Journal (Consult.)</button>
+                <button class="tab-button pb-3 px-2 text-sm font-medium" data-tab="rex-rapport"><i data-feather="file-text" class="inline-block h-4 w-4 mr-1"></i>Rapport de Crise</button>
+            `;
+
+            // 3. Change Tab Content
+            const tabContentContainer = document.getElementById('tab-content-container');
+            tabContentContainer.innerHTML = ''; // Clear all old content
+
+            // --- New Tab: REX Analyse ---
+            let rexAnalyseTab = document.createElement('div');
+            rexAnalyseTab.id = 'rex-analyse';
+            rexAnalyseTab.className = 'tab-content';
+            rexAnalyseTab.innerHTML = `
+                <h2 class="text-2xl font-bold mb-6 text-gray-800">Analyse du Retour d'Expérience (REX)</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Points Forts -->
+                    <div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                        <h3 class="text-lg font-semibold mb-4 text-green-600">Points Forts</h3>
+                        <div class="flex space-x-2 mb-4">
+                            <input type="text" id="rex-fort-input" class="flex-1 bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Ajouter un point fort...">
+                            <button id="add-rex-fort-btn" class="bg-green-600 hover:bg-green-700 text-white p-2 rounded-md"><i data-feather="plus"></i></button>
+                        </div>
+                        <ul id="rex-fort-list" class="list-disc list-inside space-y-2 text-gray-700"></ul>
+                    </div>
+                    <!-- Points Faibles -->
+                    <div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                        <h3 class="text-lg font-semibold mb-4 text-red-600">Axes d'Amélioration</h3>
+                        <div class="flex space-x-2 mb-4">
+                            <input type="text" id="rex-faible-input" class="flex-1 bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Ajouter un point faible...">
+                            <button id="add-rex-faible-btn" class="bg-red-600 hover:bg-red-700 text-white p-2 rounded-md"><i data-feather="plus"></i></button>
+                        </div>
+                        <ul id="rex-faible-list" class="list-disc list-inside space-y-2 text-gray-700"></ul>
+                    </div>
+                </div>`;
+            tabContentContainer.appendChild(rexAnalyseTab);
+
+            // --- New Tab: REX Plan d'Action ---
+            let rexPlanActionTab = document.createElement('div');
+            rexPlanActionTab.id = 'rex-plan-action';
+            rexPlanActionTab.className = 'tab-content hidden';
+            rexPlanActionTab.innerHTML = `
+                <h2 class="text-2xl font-bold mb-6 text-gray-800">Plan d'Action Correctif (REX)</h2>
+                <div class="bg-white p-6 rounded-lg mb-8 border border-gray-200 shadow-sm">
+                    <h3 class="font-semibold mb-4 text-gray-700">Nouvelle Action Corrective</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div class="col-span-1 md:col-span-3"><label for="rex-action-text" class="block text-sm font-medium text-gray-600">Action requise</label><input type="text" id="rex-action-text" class="mt-1 w-full bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                        <div><label for="rex-action-pilot" class="block text-sm font-medium text-gray-600">Pilote</label><select id="rex-action-pilot" class="mt-1 w-full bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"></select></div>
+                        <div><label for="rex-action-deadline" class="block text-sm font-medium text-gray-600">Échéance</label><input type="text" id="rex-action-deadline" placeholder="Ex: 30/11/2025" class="mt-1 w-full bg-gray-50 border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                        <button id="rex-add-action-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-md flex items-center justify-center shadow-sm"><i data-feather="plus" class="h-5 w-5 mr-2"></i> Ajouter</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="w-full text-sm text-left text-gray-600"><thead class="text-xs text-gray-700 uppercase bg-gray-100"><tr><th class="px-6 py-3">Action</th><th class="px-6 py-3">Pilote</th><th class="px-6 py-3">Échéance</th><th class="px-6 py-3 w-48">Statut</th></tr></thead><tbody id="rex-action-plan-table-body" class="bg-white"></tbody></table>
+                </div>`;
+            tabContentContainer.appendChild(rexPlanActionTab);
+
+            // --- New Tab: Journal (Read-only) ---
+            let journalTab = document.createElement('div');
+            journalTab.id = 'journal';
+            journalTab.className = 'tab-content hidden';
+            journalTab.innerHTML = `<h2 class="text-2xl font-bold mb-6 text-gray-800">Journal de Crise (Consultation)</h2><div class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm"><div id="journal-entries" class="space-y-4"></div></div>`;
+            tabContentContainer.appendChild(journalTab);
+            updateJournalUI(); // Populate the read-only journal
+
+            // --- New Tab: Rapport ---
+            let rexRapportTab = document.createElement('div');
+            rexRapportTab.id = 'rex-rapport';
+            rexRapportTab.className = 'tab-content hidden';
+            rexRapportTab.innerHTML = `
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">Rapport de Crise</h2>
+                    <button id="copy-report-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-md flex items-center shadow-sm">
+                        <i data-feather="copy" class="h-5 w-5 mr-2"></i> Copier le Rapport
+                    </button>
+                </div>
+                <div id="report-content-container" class="bg-white p-6 rounded-lg border border-gray-200 shadow-sm text-gray-800 prose max-w-none"></div>
+            `;
+            tabContentContainer.appendChild(rexRapportTab);
+
+            // 4. Setup new event listeners
+            setupTabs(); // Re-run setupTabs for new tabs
+            document.getElementById('add-rex-fort-btn').addEventListener('click', addRexFort);
+            document.getElementById('add-rex-faible-btn').addEventListener('click', addRexFaible);
+            document.getElementById('rex-add-action-btn').addEventListener('click', addRexAction);
+            document.getElementById('copy-report-btn').addEventListener('click', copyReport);
+
+            // 5. Populate new elements
+            populatePilotSelect('rex-action-pilot');
+            renderRexActionPlan();
+
+            // 6. Generate and populate report
+            const crisisEndTime = new Date();
+            const duration = crisisStartTime ? (crisisEndTime - crisisStartTime) : 0;
+            generateReport(crisisEndTime, duration);
+            
+            feather.replace();
+        }
+        
+        function addRexFort() {
+            const input = document.getElementById('rex-fort-input');
+            const text = input.value.trim();
+            if (text === '') return;
+            rexPointsForts.push(text);
+            renderRexLists();
+            input.value = '';
+        }
+        
+        function addRexFaible() {
+            const input = document.getElementById('rex-faible-input');
+            const text = input.value.trim();
+            if (text === '') return;
+            rexPointsFaibles.push(text);
+            renderRexLists();
+            input.value = '';
+        }
+        
+        function renderRexLists() {
+            const fortList = document.getElementById('rex-fort-list');
+            const faibleList = document.getElementById('rex-faible-list');
+            fortList.innerHTML = rexPointsForts.map(item => `<li>${item}</li>`).join('');
+            faibleList.innerHTML = rexPointsFaibles.map(item => `<li>${item}</li>`).join('');
+        }
+        
+        function addRexAction() {
+            const textInput = document.getElementById('rex-action-text');
+            const pilotInput = document.getElementById('rex-action-pilot');
+            const deadlineInput = document.getElementById('rex-action-deadline');
+            if (textInput.value.trim() === '') return;
+            rexActionPlanData.push({
+                id: rexActionIdCounter++,
+                text: textInput.value.trim(),
+                pilot: pilotInput.value,
+                deadline: deadlineInput.value.trim() || 'N/A',
+                status: 'À faire'
+            });
+            renderRexActionPlan();
+            textInput.value = '';
+            deadlineInput.value = '';
+        }
+        
+        function renderRexActionPlan() {
+            const tbody = document.getElementById('rex-action-plan-table-body');
+            if (!tbody) return;
+            const statusColors = {
+                'À faire': 'bg-gray-100 text-gray-800 border-gray-200 border',
+                'En cours': 'bg-amber-100 text-amber-800 border-amber-200 border animate-pulse',
+                'Terminé': 'bg-green-100 text-green-800 border-green-200 border',
+                'Bloqué': 'bg-red-100 text-red-800 border-red-200 border',
+            };
+            if (rexActionPlanData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">Aucune action corrective définie.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rexActionPlanData.map(action => `
+                <tr class="bg-white border-b border-gray-200 hover:bg-gray-50">
+                    <td class="px-6 py-4 font-medium text-gray-900">${action.text}</td>
+                    <td class="px-6 py-4">${action.pilot}</td>
+                    <td class="px-6 py-4">${action.deadline}</td>
+                    <td class="px-6 py-4">
+                        <select class="rex-action-status-select bg-white border border-gray-300 rounded-md p-1.5 text-gray-900 w-full focus:ring-2 focus:ring-blue-500" data-id="${action.id}">
+                            ${Object.keys(statusColors).map(s => `<option value="${s}" ${s === action.status ? 'selected' : ''}>${s}</option>`).join('')}
+                        </select>
+                        <span class="status-badge mt-2 ${statusColors[action.status]}">${action.status}</span>
+                    </td>
+                </tr>`).join('');
+            
+            document.querySelectorAll('.rex-action-status-select').forEach(select => {
+                select.addEventListener('change', (e) => updateRexActionStatus(parseInt(e.target.dataset.id), e.target.value));
+            });
+        }
+
+        function updateRexActionStatus(id, newStatus) {
+            const action = rexActionPlanData.find(a => a.id === id);
+            if (action) {
+                action.status = newStatus;
+                renderRexActionPlan();
+            }
+        }
+        
+        function generateReport(endTime, duration) {
+            const reportContainer = document.getElementById('report-content-container');
+            if (!reportContainer) return;
+            
+            const formatDuration = (ms) => {
+                if(isNaN(ms) || ms < 0) return "N/A";
+                const hours = Math.floor(ms / 3600000).toString().padStart(2, '0');
+                const minutes = Math.floor((ms % 3600000) / 60000).toString().padStart(2, '0');
+                const seconds = Math.floor((ms % 60000) / 1000).toString().padStart(2, '0');
+                return `${hours}h ${minutes}m ${seconds}s`;
+            }
+
+            const journalHTML = journalData.map(entry => `
+                <tr>
+                    <td class="border border-gray-300 p-2 align-top text-gray-700">${entry.timestamp.toLocaleString('fr-FR')}</td>
+                    <td class="border border-gray-300 p-2 text-gray-800 ${entry.type === 'system' ? 'journal-entry-system' : (entry.type === 'inject' ? 'journal-entry-inject' : '')}">${entry.text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</td>
+                </tr>
+            `).join('');
+
+            reportContainer.innerHTML = `
+                <div id="printable-report">
+                    <h1 class="text-3xl font-bold mb-4 text-gray-900 border-b pb-2">Rapport de Crise Post-Incident</h1>
+                    <p class="text-gray-600 mb-6"><em>Généré le ${new Date().toLocaleString('fr-FR')}</em></p>
+                    
+                    <h2 class="text-2xl font-semibold mb-3 text-gray-800">Résumé de la Crise</h2>
+                    <table class="w-full text-left border-collapse border border-gray-300 mb-8">
+                        <tbody>
+                            <tr class="bg-gray-50"><td class="border border-gray-300 p-2 font-semibold text-gray-700">Début de la crise</td><td class="border border-gray-300 p-2 text-gray-800">${crisisStartTime ? crisisStartTime.toLocaleString('fr-FR') : 'N/A'}</td></tr>
+                            <tr><td class="border border-gray-300 p-2 font-semibold text-gray-700">Fin de la crise</td><td class="border border-gray-300 p-2 text-gray-800">${endTime.toLocaleString('fr-FR')}</td></tr>
+                            <tr class="bg-gray-50"><td class="border border-gray-300 p-2 font-semibold text-gray-700">Durée totale</td><td class="border border-gray-300 p-2 text-gray-800">${formatDuration(duration)}</td></tr>
+                            <tr><td class="border border-gray-300 p-2 font-semibold text-gray-700">Nombre d'entrées au journal</td><td class="border border-gray-300 p-2 text-gray-800">${journalData.length}</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h2 class="text-2xl font-semibold mb-3 text-gray-800">Chronologie des Événements (Main Courante)</h2>
+                    <table class="w-full text-left border-collapse border border-gray-300 mb-8">
+                        <thead>
+                            <tr class="bg-gray-100">
+                                <th class="border border-gray-300 p-2 w-1/3 text-gray-700">Horodatage</th>
+                                <th class="border border-gray-300 p-2 text-gray-700">Entrée (Action, Décision, Information)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${journalHTML}
+                        </tbody>
+                    </table>
+
+                    <h2 class="text-2xl font-semibold mb-3 text-gray-800">Prochaines Étapes</h2>
+                    <p class="text-gray-700 mb-2">La phase de crise est terminée. La phase de post-crise (Retour d'Expérience) est activée.</p>
+                    <ul class="list-disc list-inside text-gray-700">
+                        <li><strong>Analyse REX :</strong> Utiliser l'onglet "Analyse REX" pour documenter les points forts et faibles.</li>
+                        <li><strong>Actions Correctives :</strong> Utiliser l'onglet "Plan d'Action REX" pour piloter les mesures correctives.</li>
+                    </ul>
+                </div>
+            `;
+        }
+
+        function copyReport() {
+            const reportContent = document.getElementById('printable-report').innerText;
+            navigator.clipboard.writeText(reportContent).then(() => {
+                const btn = document.getElementById('copy-report-btn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i data-feather="check" class="h-5 w-5 mr-2"></i> Copié !';
+                feather.replace();
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    feather.replace();
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy report: ', err);
+            });
+        }
+        function updateClock() {
+             document.getElementById('clock').textContent = new Date().toLocaleTimeString('fr-FR');
+        }
+
+        // --- FIREBASE INTEGRATION ---
+        
+        async function saveToCloud() {
+            // Collect Current State
+            const state = {
+                appMode,
+                crisisStartTime: crisisStartTime ? crisisStartTime.getTime() : null,
+                journalData,
+                actionPlanData,
+                communicationsLog,
+                rexPointsForts,
+                rexPointsFaibles,
+                rexActionPlanData,
+                // New fields to save
+                actionIdCounter,
+                rexActionIdCounter,
+                importedPgcContent,
+                currentScenario: document.getElementById('scenario-select').value,
+                socialFeedData
+            };
+            
+            // Call external function (from firebase-manager.js)
+            if (window.exportCrisisToFirebase) {
+                // Pause timer visually
+                if (timerInterval) clearInterval(timerInterval);
+                document.getElementById('crisis-timer').classList.add('text-yellow-400');
+                
+                await window.exportCrisisToFirebase(state);
+                
+                // Resume timer logic if needed (or keep paused)
+                if (crisisStartTime) timerInterval = setInterval(updateTimer, 1000);
+                 document.getElementById('crisis-timer').classList.remove('text-yellow-400');
+            } else {
+                alert("Erreur: Le module Firebase n'est pas chargé correctly.");
+            }
+        }
+
+        async function loadFromCloud() {
+            if (window.importCrisisFromFirebase) {
+                const loadedData = await window.importCrisisFromFirebase();
+                if (loadedData) {
+                    // Check Mode Transition
+                    const currentMode = appMode;
+                    const targetMode = loadedData.appMode || 'crisis';
+
+                    // Switch UI based on target mode
+                    if (targetMode === 'crisis') {
+                        resetToCrisisModeUI();
+                    } else if (targetMode === 'post-crisis') {
+                        setupPostCrisisMode();
+                    }
+
+                    // Restore State
+                    appMode = targetMode;
+                    crisisStartTime = loadedData.crisisStartTime ? new Date(loadedData.crisisStartTime) : null;
+                    
+                    // Restore Arrays (handle empty)
+                    journalData = (loadedData.journalData || []).map(e => ({...e, timestamp: new Date(e.timestamp)}));
+                    actionPlanData = loadedData.actionPlanData || [];
+                    communicationsLog = (loadedData.communicationsLog || []).map(e => ({...e, timestamp: new Date(e.timestamp)}));
+                    rexPointsForts = loadedData.rexPointsForts || [];
+                    rexPointsFaibles = loadedData.rexPointsFaibles || [];
+                    rexActionPlanData = loadedData.rexActionPlanData || [];
+                    socialFeedData = loadedData.socialFeedData || [];
+                    
+                    // Restore Counters and other state
+                    actionIdCounter = loadedData.actionIdCounter || 0;
+                    rexActionIdCounter = loadedData.rexActionIdCounter || 0;
+                    importedPgcContent = loadedData.importedPgcContent || null;
+                    if (loadedData.currentScenario) {
+                        document.getElementById('scenario-select').value = loadedData.currentScenario;
+                        const event = new Event('change');
+                        document.getElementById('scenario-select').dispatchEvent(event);
+                    }
+                    if (importedPgcContent) document.getElementById('file-name-display').textContent = "PGC importé restauré";
+
+                    // UI Refresh
+                    updateJournalUI();
+                    if (targetMode === 'crisis') {
+                        renderActionPlan();
+                        renderCommunicationsLog();
+                    } else {
+                         renderRexLists();
+                         renderRexActionPlan();
+                    }
+                    
+                    if (targetMode === 'crisis' && crisisStartTime) {
+                         document.getElementById('crisis-status').textContent = 'Crise en cours (Restaurée)';
+                         document.getElementById('crisis-status').classList.remove('text-green-400');
+                         document.getElementById('crisis-status').classList.add('text-red-400', 'crisis-declared');
+                         document.getElementById('crisis-status-container').classList.add('crisis-declared');
+                         document.getElementById('crisis-timer').classList.remove('hidden');
+                         
+                         // Restart Timer
+                         if(timerInterval) clearInterval(timerInterval);
+                         timerInterval = setInterval(updateTimer, 1000);
+                         updateTimer();
+                         
+                         // Show proper buttons
+                         document.getElementById('declare-crisis-btn').disabled = true;
+                         document.getElementById('end-crisis-btn').classList.remove('hidden');
+                         document.getElementById('reset-app-btn').classList.add('hidden');
+                         document.getElementById('pgc-importer-container').classList.add('hidden');
+                         document.getElementById('simulation-engine-container').classList.remove('hidden');
+                         document.getElementById('get-advice-btn').disabled = false;
+                         document.getElementById('open-comm-modal-btn').disabled = false;
+                         
+                         // Restore and Resume Social Feed
+                         document.getElementById('social-media-container').classList.remove('hidden');
+                         const feedContainer = document.getElementById('social-feed');
+                         feedContainer.innerHTML = '';
+                         if (socialFeedData.length > 0) {
+                             socialFeedData.forEach(tweet => {
+                                 const time = new Date(tweet.time);
+                                 const div = document.createElement('div');
+                                 div.className = 'tweet-card bg-white border border-gray-200 shadow-sm p-3 rounded-md text-xs relative mb-3';
+                                 div.innerHTML = `
+                                    <div class="flex justify-between mb-1">
+                                        <span class="font-bold text-blue-600">@${tweet.user}</span>
+                                        <span class="text-gray-500" style="font-size: 0.7rem;">${time.toLocaleTimeString()}</span>
+                                    </div>
+                                    <p class="text-gray-800 leading-tight">${tweet.text}</p>
+                                 `;
+                                 feedContainer.appendChild(div);
+                             });
+                             feedContainer.scrollTop = feedContainer.scrollHeight;
+                         } else {
+                             feedContainer.innerHTML = '<p class="text-center text-gray-500 text-xs italic py-10">En attente de flux...</p>';
+                         }
+                         startEventSimulation();
+                         startSocialMediaSimulation();
+
+                    } else if (targetMode === 'post-crisis') {
+                         document.getElementById('crisis-status').textContent = 'Post-Crise (REX)';
+                         document.getElementById('crisis-status').classList.remove('text-red-400', 'crisis-declared');
+                         document.getElementById('crisis-status').classList.add('text-blue-400');
+                         document.getElementById('crisis-status-container').classList.add('post-crisis-mode');
+                         if(timerInterval) clearInterval(timerInterval);
+                         document.getElementById('crisis-timer').textContent = "Terminé";
+                    }
+                    
+                    alert("✅ Données restaurées !");
+                }
+            } else {
+                alert("Erreur: Le module Firebase n'est pas chargé correctly.");
+            }
+        }
+
+
+
+        // --- SOCIAL MEDIA FUNCTIONS ---
+        function startSocialMediaSimulation() {
+             if (socialMediaInterval) clearInterval(socialMediaInterval);
+             
+             // First tweet immediately
+             setTimeout(postFakeTweet, 2000);
+
+             // Then random interval between 10s and 45s
+             const loop = () => {
+                 const delay = Math.floor(Math.random() * (45000 - 10000 + 1) + 10000);
+                 socialMediaInterval = setTimeout(() => {
+                     postFakeTweet();
+                     if (appMode === 'crisis') loop();
+                 }, delay);
+             };
+             loop();
+        }
+
+        function stopSocialMediaSimulation() {
+            if (socialMediaInterval) clearTimeout(socialMediaInterval);
+            socialMediaInterval = null;
+        }
+
+        function startEventSimulation() {
+            if (eventSimulationTimeout) clearTimeout(eventSimulationTimeout);
+            
+            // Fonction récursive pour programmer le prochain événement
+            const scheduleNextEvent = () => {
+                // Délai aléatoire entre 3 et 8 minutes pour laisser le temps de la réflexion
+                // (180000 à 480000 ms)
+                const minDelay = 180000; 
+                const maxDelay = 480000;
+                const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1) + minDelay);
+                
+                // console.log(`Prochain événement système (inject) prévu dans ${Math.round(delay/1000)} secondes.`);
+
+                eventSimulationTimeout = setTimeout(() => {
+                    if (appMode === 'crisis') {
+                        injectRandomEvent();
+                        // Effet sonore optionnel ici si désiré
+                        scheduleNextEvent(); // Programmer le suivant
+                    }
+                }, delay);
+            };
+
+            scheduleNextEvent(); // Lancer la boucle
+        }
+
+        function stopEventSimulation() {
+            if (eventSimulationTimeout) clearTimeout(eventSimulationTimeout);
+            eventSimulationTimeout = null;
+        }
+
+        async function postFakeTweet() {
+            if (appMode !== 'crisis') return;
+            
+            const apiKey = document.getElementById('api-key-input').value || localStorage.getItem('gemini_api_key');
+            // 70% chance to generate with AI if key exists
+            const useGemini = apiKey && Math.random() > 0.3;
+
+            if (useGemini) {
+                try {
+                    await generateGeminiTweet();
+                } catch (e) {
+                    console.warn("Gemini tweet failed, fallback to static", e);
+                    postStaticTweet();
+                }
+            } else {
+                postStaticTweet();
+            }
+        }
+
+        async function generateGeminiTweet() {
+            const user = fakeUsers[Math.floor(Math.random() * fakeUsers.length)];
+            const scenario = document.getElementById('scenario-select').value;
+            const journalContext = journalData.slice(-3).map(entry => entry.text).join(' | ');
+
+            const prompt = `Génère un tweet court (max 280 chars) réaliste au sujet de la crise en cours chez DoctoLibre.
+            Contexte Scénario: ${scenario}.
+            Dernières nouvelles: ${journalContext}.
+            
+            Persona de l'auteur du tweet :
+            Nom: ${user.name}
+            Handle: ${user.handle}
+            Ton: Critique, inquiet, ou moqueur.
+            
+            Le tweet doit contenir un hashtag pertinent. Ne met pas de guillemets.`;
+
+            const apiKey = document.getElementById('api-key-input').value || localStorage.getItem('gemini_api_key');
+            const selectedModel = document.getElementById('gemini-model-select').value || 'gemini-1.5-flash';
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+
+            const result = await response.json();
+            if(!response.ok) throw new Error("API Error");
+            const tweetText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+            
+            if (tweetText) {
+                addTweetToFeed(user, tweetText.trim(), new Date());
+            } else {
+                throw new Error("Empty AI response");
+            }
+        }
+
+        function postStaticTweet() {
+             const user = fakeUsers[Math.floor(Math.random() * fakeUsers.length)];
+            const template = socialTemplates[Math.floor(Math.random() * socialTemplates.length)];
+            const hashtag = fakeHashtags[Math.floor(Math.random() * fakeHashtags.length)];
+            
+            const tweetText = `${template} ${hashtag}`;
+            addTweetToFeed(user, tweetText, new Date());
+        }
+
+        function addTweetToFeed(user, text, time) {
+            socialFeedData.push({ user: user.handle, text: text, time: time });
+            if (socialFeedData.length > 50) socialFeedData.shift(); // Keep max 50 in memory
+
+            const feedContainer = document.getElementById('social-feed');
+            
+            // Remove placeholder if exists
+            if (feedContainer.querySelector('p.text-center')) {
+                feedContainer.innerHTML = '';
+            }
+
+            const tweetDiv = document.createElement('div');
+            tweetDiv.className = 'tweet-card bg-white border border-gray-200 shadow-sm p-3 rounded-md text-xs relative tweet-enter mb-3';
+            tweetDiv.innerHTML = `
+                <div class="flex justify-between mb-1">
+                    <span class="font-bold text-blue-600">${user.handle}</span>
+                    <span class="text-gray-500" style="font-size: 0.7rem;">${time.toLocaleTimeString()}</span>
+                </div>
+                <p class="text-gray-800 leading-tight">${text}</p>
+            `;
+            
+            feedContainer.appendChild(tweetDiv);
+            feedContainer.scrollTop = feedContainer.scrollHeight;
+        }
+
+        function resetToCrisisModeUI() {
+            // Revert Sidebar
+            document.getElementById('pgc-importer-container').classList.remove('hidden');
+            document.getElementById('simulation-engine-container').classList.add('hidden');
+            document.getElementById('gemini-advisor-container').innerHTML = `
+                <h3 class="text-lg font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">Conseiller IA Gemini</h3>
+                 <button id="get-advice-btn" class="w-full mb-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition-colors disabled:opacity-50 shadow-sm" disabled>
+                    <i data-feather="cpu" class="mr-2 h-5 w-5"></i> Analyser la situation
+                </button>
+                <div id="gemini-advice-container" class="space-y-3 bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                    <p class="text-sm text-gray-500 italic">Le conseiller IA s'activera une fois la crise déclarée.</p>
+                </div>`;
+            document.getElementById('get-advice-btn').addEventListener('click', getGeminiAdvice);
+
+            // Revert Status Style
+            document.getElementById('crisis-status-container').classList.remove('post-crisis-mode');
+            document.getElementById('crisis-status').classList.remove('text-blue-400');
+            document.getElementById('crisis-status').classList.add('text-green-400'); // Default to nominal, overridden later if crisis
+            document.getElementById('crisis-status').textContent = 'Situation Nominale';
+
+            // Revert Buttons
+            document.getElementById('reset-app-btn').classList.add('hidden');
+            document.getElementById('declare-crisis-btn').classList.remove('hidden');
+            document.getElementById('declare-crisis-btn').disabled = false;
+            document.getElementById('end-crisis-btn').classList.add('hidden');
+            
+            // Clean Social Feed
+            stopSocialMediaSimulation();
+            document.getElementById('social-media-container').classList.add('hidden');
+            document.getElementById('social-feed').innerHTML = '<p class="text-center text-gray-500 text-xs italic py-10">En attente de flux...</p>';
+            socialFeedData = [];
+
+            // Revert Tabs
+            const tabNav = document.getElementById('tabs-nav');
+            tabNav.innerHTML = `
+                <button class="tab-button active" data-tab="plan-action"><i data-feather="list" class="inline-block h-4 w-4 mr-1"></i>Plan d'Action</button>
+                <button class="tab-button" data-tab="journal"><i data-feather="book-open" class="inline-block h-4 w-4 mr-1"></i>Journal de Crise</button>
+                <button class="tab-button" data-tab="cellule"><i data-feather="users" class="inline-block h-4 w-4 mr-1"></i>Cellule de Crise</button>
+                <button class="tab-button" data-tab="communications"><i data-feather="radio" class="inline-block h-4 w-4 mr-1"></i>Communications</button>
+                <button class="tab-button" data-tab="annuaire"><i data-feather="phone" class="inline-block h-4 w-4 mr-1"></i>Annuaire</button>
+                <button class="tab-button" data-tab="phases"><i data-feather="git-commit" class="inline-block h-4 w-4 mr-1"></i>Phases</button>
+            `;
+
+            // Revert Tab Content
+            const tabContentContainer = document.getElementById('tab-content-container');
+            tabContentContainer.innerHTML = `
+                <div id="plan-action" class="tab-content"></div>
+                <div id="journal" class="tab-content hidden"></div>
+                <div id="cellule" class="tab-content hidden"></div>
+                <div id="communications" class="tab-content hidden"></div>
+                <div id="annuaire" class="tab-content hidden"></div>
+                <div id="phases" class="tab-content hidden"></div>
+            `;
+
+            // Repopulate Content
+            populateTabContent('plan-action', `<h2 class="text-2xl font-bold mb-6 text-gray-900">Plan d'Action Opérationnel</h2><div class="bg-gray-50 border border-gray-200 p-6 rounded-lg mb-8 shadow-sm"><h3 class="font-semibold mb-4 text-gray-800">Nouvelle Action</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end"><div class="col-span-1 md:col-span-3"><label for="action-text" class="block text-sm font-medium text-gray-700">Action requise</label><input type="text" id="action-text" class="mt-1 w-full bg-white border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"></div><div><label for="action-pilot" class="block text-sm font-medium text-gray-700">Pilote</label><select id="action-pilot" class="mt-1 w-full bg-white border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"></select></div><div><label for="action-deadline" class="block text-sm font-medium text-gray-700">Échéance</label><input type="text" id="action-deadline" placeholder="Ex: Immédiat, 15:30" class="mt-1 w-full bg-white border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"></div><button id="add-action-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-md flex items-center justify-center shadow-sm"><i data-feather="plus" class="h-5 w-5 mr-2"></i> Ajouter</button></div></div><div class="overflow-x-auto"><table class="w-full text-sm text-left text-gray-700"><thead class="text-xs text-gray-700 uppercase bg-gray-100 border-b border-gray-200"><tr><th scope="col" class="px-6 py-3">Action</th><th scope="col" class="px-6 py-3">Pilote</th><th scope="col" class="px-6 py-3">Échéance</th><th scope="col" class="px-6 py-3 w-48">Statut</th></tr></thead><tbody id="action-plan-table-body"></tbody></table></div>`);
+            populateTabContent('journal', `<h2 class="text-2xl font-bold mb-6 text-gray-900">Journal de Crise (Main Courante)</h2><div class="bg-gray-50 border border-gray-200 p-6 rounded-lg shadow-sm"><div class="flex space-x-4"><input type="text" id="journal-entry-input" class="flex-1 bg-white border border-gray-300 rounded-md px-4 py-2 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ajouter une entrée..."><button id="add-journal-entry-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-md flex items-center shadow-sm"><i data-feather="plus" class="h-5 w-5 mr-2"></i> Ajouter</button></div><div id="journal-entries-container" class="mt-6 border-t border-gray-200 pt-6"><h3 class="font-semibold mb-4 text-gray-800">Entrées du journal :</h3><div id="journal-entries" class="space-y-4"></div></div></div>`);
+            populateTabContent('cellule', `<h2 class="text-2xl font-bold mb-6 text-gray-900">Composition de la Cellule de Crise</h2><div id="cellule-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div>`);
+            populateTabContent('communications', `<h2 class="text-2xl font-bold mb-6 text-gray-900">Communications de Crise</h2><div class="bg-gray-50 border border-gray-200 p-6 rounded-lg shadow-sm"><div class="flex items-center justify-between mb-4"><div><label for="comm-target" class="block text-sm font-medium text-gray-700 mb-1">Cible</label><select id="comm-target" class="bg-white border border-gray-300 rounded-md px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"><option>Interne (Collaborateurs)</option><option>Externe (Utilisateurs)</option><option>Externe (Presse)</option><option>Externe (Autorités)</option></select></div><button id="open-comm-modal-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-md flex items-center justify-center disabled:opacity-50 shadow-sm" disabled><i data-feather="plus-circle" class="h-5 w-5 mr-2"></i> Rédiger une Communication</button></div></div><div id="comm-log-container" class="mt-8"><h3 class="text-lg font-semibold mb-4 text-gray-800">Historique des Communications Validées</h3><div id="comm-log" class="space-y-4"><p class="text-sm text-gray-500 italic">Aucune communication validée.</p></div></div>`);
+            populateTabContent('annuaire', `<h2 class="text-2xl font-bold mb-6 text-gray-900">Annuaire de Crise</h2><div><h3 class="text-xl font-semibold mb-4 text-blue-700">Contacts Internes</h3><div id="internal-contacts" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div></div><div class="mt-8"><h3 class="text-xl font-semibold mb-4 text-orange-700">Contacts Externes</h3><div id="external-contacts" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div></div>`);
+            populateTabContent('phases', `<h2 class="text-2xl font-bold mb-6 text-gray-900">Phases de la Gestion de Crise</h2><div id="phases-container" class="space-y-8"></div>`);
+            
+             // Re-bind listeners
+            document.getElementById('add-journal-entry-btn').addEventListener('click', () => addJournalEntry('normal'));
+            document.getElementById('journal-entry-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') addJournalEntry('normal'); });
+            document.getElementById('add-action-btn').addEventListener('click', addAction);
+             document.getElementById('open-comm-modal-btn').addEventListener('click', () => {
+                document.getElementById('comm-modal-target').textContent = document.getElementById('comm-target').value;
+                document.getElementById('comm-message-modal').value = '';
+                document.getElementById('comm-generation-status-modal').textContent = '';
+                document.getElementById('comm-modal').classList.remove('hidden');
+            });
+
+             // Repopulate dynamic content
+            populateCrisisTeam();
+            populateCrisisPhases();
+            populateDirectory();
+            populatePilotSelect('action-pilot');
+            setupTabs();
+            feather.replace();
+        }
+
+        function updateTimer() {
+            if (!crisisStartTime) return;
+            const diff = new Date() - crisisStartTime;
+            const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
+            const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+            const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+            document.getElementById('crisis-timer').textContent = `${h}:${m}:${s}`;
+        }
+    </script>
+</body>
+</html>
+
